@@ -1,0 +1,89 @@
+
+#Import all the necessary Libraries
+from bs4 import BeautifulSoup
+import requests
+import csv
+import pandas as pd
+#import geocoder
+
+
+#### Populate the contents from Web Into CSV file###
+
+#Read the URL
+url = "https://en.wikipedia.org/wiki/List_of_postal_codes_of_Canada:_M"
+requests = requests.get(url) 
+#Gather the Contents
+soup = BeautifulSoup(requests.content,'html5lib') 
+
+#Create a CSV File
+csv_file = open('postal_code.csv_3', 'w')
+csv_writer = csv.writer(csv_file)
+csv_writer.writerow(['Postal Code', 'Borough', 'Neighbourhood'])
+
+#Read the essential tags containing the contents required
+rows = soup.find_all('td')
+for row in rows:
+    postalcode = row.find('b')
+    if postalcode:
+        postalcode_1 = postalcode.text
+    else:
+        postalcode_1 = ''
+    a_tags = row.select('span')
+    for a_tag in a_tags:
+        hrefs = a_tag.find_all('a')
+#Resetting the Variables for the new row
+        index    = 1
+        borough  = ' '
+        nexthood = ' ' 
+#First Index of a given HREF is Borough and Other are neighbourhood     
+        for href in hrefs:
+                if index == 1:
+                    borough = href.text
+                    index   = index + 1
+                else:
+                    nexthood = href.text + ',' + nexthood
+                    index = index + 1          
+        csv_writer.writerow([postalcode_1 ,borough,nexthood]) 
+
+csv_file.close()
+
+#### Read the contents of the file and modify the changes
+df = pd.read_csv('postal_code.csv_3')
+#Drop Nan rows
+df.dropna(subset=["Postal Code"], axis=0, inplace=True)
+
+#EMpty SPaces replace by NAN
+nan_value = float("NAN")
+df.replace(" ", nan_value, inplace=True)
+#Drop rows with NAN
+df.dropna(subset=["Borough"], axis=0, inplace=True)
+df.dropna(subset=["Neighbourhood"], axis=0, inplace=True)
+
+#Reset the Default Index
+df.reset_index(inplace=True,drop=True)
+
+#Print the Shape 
+shape = df.shape
+print(shape)  
+
+
+## Populate Latitute and Longitude of the Postal Codes
+
+#First add two new columns
+df['Latitude']  = " "
+df['Longitude'] = " "
+
+#Read the Location CSV
+df_ll = pd.read_csv('http://cocl.us/Geospatial_data')
+
+#Loop Through both DF and Replace the contents in DF
+for i in range(len(df)):
+    for j in range(len(df_ll)):
+         if df.loc[i, "Postal Code"] == df_ll.loc[j , "Postal Code"] :
+            df.loc[i , "Latitude"]  = df_ll.loc[j, "Latitude"]
+            df.loc[i , "Longitude"] = df_ll.loc[j, "Longitude"]
+            
+                            
+                    
+                                    
+#df.head()
